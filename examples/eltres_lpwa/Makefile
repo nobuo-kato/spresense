@@ -43,7 +43,9 @@ PRIORITY  = $(CONFIG_EXAMPLES_ELTRES_LPWA_PRIORITY)
 STACKSIZE = $(CONFIG_EXAMPLES_ELTRES_LPWA_STACKSIZE)
 MODULE    = $(CONFIG_EXAMPLES_ELTRES_LPWA)
 
-CSRCS = main_LPWA_sample_app.c
+CSRCS += calc_distance.c
+CSRCS += calc_distance_CXM150x.c
+CSRCS += main_LPWA_sample_app.c
 MAINSRC = eltres_lpwa_main.c
 
 include $(APPDIR)/Application.mk
