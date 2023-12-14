@@ -60,7 +60,6 @@
 #include "CXM150x_Utility.h"
 #include "CXM150x_Port.h"
 #include "main_LPWA_sample_app.h"
-#include "calc_distance.h"
 
 // Sample application name definition
 #define SAMPLE_APP_NAME   "main_LPWA_sample_app"
@@ -1249,9 +1248,6 @@ int main_LPWA_sample_app(void){
     // RTC settings
     set_rtc_time();
 
-    // initialize calc distance.    
-    init_calc_distance((void *)0);
-
     // Register INT_OUT1 interrupt function
     register_CXM150x_LPWA_start_interrupt(NULL,int1_callback);
 
@@ -1274,8 +1270,7 @@ int main_LPWA_sample_app(void){
 
         // resume CXM150x
         resume_CXM150x();
-        continue;
-        
+
         if(g_push_btn_flag == FLAG_ON){
             if(g_profile_event_enable == FLAG_OFF){
                 printf("Event profile disable\r\n");
