@@ -1,0 +1,30 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_ELTRES_CALC_DISTANCE_TEST
+	tristate "ELTRES calc distance test application"
+	depends on EXTERNALS_ELTRES
+	default n
+	---help---
+		Enable the ELTRES calc distance test application
+
+if EXAMPLES_ELTRES_CALC_DISTANCE_TEST
+
+config EXAMPLES_ELTRES_CALC_DISTANCE_TEST_PROGNAME
+	string "Program name"
+	default "eltres_calc_distance_test"
+	---help---
+		This is the name of the program that will be used when the NSH ELF
+		program is installed.
+
+config EXAMPLES_ELTRES_CALC_DISTANCE_TEST_PRIORITY
+	int "ELTRES calc distance test application task priority"
+	default 100
+
+config EXAMPLES_ELTRES_CALC_DISTANCE_TEST_STACKSIZE
+	int "ELTRES calc distance test application stack size"
+	default DEFAULT_TASK_STACKSIZE
+
+endif
