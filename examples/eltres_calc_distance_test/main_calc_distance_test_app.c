@@ -70,24 +70,6 @@
 #define SAMPLE_APP_VER    "0.0.1"
 
 // ===========================================================================
-//! Display sample app and API version
-/*!
- *
- * @param [in] none
- * @param [out] none
- * @par Global variable
- *        [in] none
- *        [out] none
- * @return none
-*/
-// ===========================================================================
-static void disp_version(void){
-    CmdResGetCXM150xAPIVersion api_ver_inf;
-    get_CXM150x_api_version(NULL,&api_ver_inf,NULL);
-    printf("%s:Ver.%s, API:Ver.%s\r\n",SAMPLE_APP_NAME,SAMPLE_APP_VER,api_ver_inf.m_version);
-}
-
-// ===========================================================================
 //! calc distance test application main function
 /*!
  *
@@ -107,11 +89,14 @@ static void disp_version(void){
 // ===========================================================================
 int main_calc_distance_test_app(void){
     int fail_count = 0;
-    disp_version();
-    printf("This program is build at %s %s\r\n", __DATE__, __TIME__);
+    printf("-- result json start ---\r\n");
+    printf("{\r\n");
     fail_count += calc_distance_port_test_main();
+    printf(",\r\n");
     fail_count += calc_distance_core_test_main();
-    printf("Fail Count = %d\n", fail_count);
+    printf(",\r\n  \"total_fail_count\": %d\r\n", fail_count);
+    printf("}\r\n");
+    printf("-- result json end ---\r\n");
     return 0;
 }
 

@@ -36,17 +36,16 @@
 include $(APPDIR)/Make.defs
 include $(SDKDIR)/Make.defs
 
-# ELTRES LPWA built-in application info
+# ELTRES CALC DISTANCE TEST built-in application info
 
 PROGNAME  = $(CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_TEST_PROGNAME)
 PRIORITY  = $(CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_TEST_PRIORITY)
 STACKSIZE = $(CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_TEST_STACKSIZE)
 MODULE    = $(CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_TEST)
 
-CSRCS += main_calc_distance_test_app.c
 CSRCS += calc_distance.c
 CSRCS += calc_distance_CXM150x.c
-
+CSRCS += main_calc_distance_test_app.c
 MAINSRC = eltres_calc_distance_test_main.c
 
 include $(APPDIR)/Application.mk

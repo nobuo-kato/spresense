@@ -5,8 +5,8 @@
 #define _USE_MATH_DEFINES // to use M_PI, this define is needed.
 #include "math.h"
 
-#if defined(CONFIG_CALC_DISTANCE_SPEED_THRESH)
-#define SPEED_THRESH (CONFIG_CALC_DISTANCE_SPEED_THRESH)
+#if defined(CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_SPEED_THRESH)
+#define SPEED_THRESH (CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_SPEED_THRESH)
 #else
 //#define SPEED_THRESH (5.0)
 #define SPEED_THRESH (0.0)
@@ -14,24 +14,22 @@
 
 #define FIX_TYPE_3D (3)
 
-//#define CALC_DISTANCE_UNIT_TEST_CORE
-#define CONFIG_CALC_DISTANCE_DEBUG
-#ifdef CONFIG_CALC_DISTANCE_DEBUG
+/// 将来的にConfigで指定できるようにする
+#define CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_UNIT_TEST_CORE
+#define CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_OUTPUT_JSON
+#define CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
+
+#ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
 static uint32_t update_called_count = 0;
 static uint32_t update_calced_count = 0;
 static uint32_t get_called_count = 0;
 #endif
 
 static double accumurated_distance;
+static double prev_lon = INVALID_LON;
+static double prev_lat = INVALID_LAT;
 static void (*lock)(void) = (void(*)(void))0;
 static void (*unlock)(void) = (void(*)(void))0;
-
-static void clearSource(CalcDistanceSource * source){
-    source->fix_type = INVALID_FIX_TYPE;
-    source->lon_deg = INVALID_LON;
-    source->lat_deg = INVALID_LAT;
-    source->speed_kph = INVALID_SPEED;
-}
 
 static double Hubeny_formula(double lat_diff, double lat_ave, double lon_diff){
     // constants not depends on position.
@@ -60,7 +58,6 @@ static double Hubeny_formula(double lat_diff, double lat_ave, double lon_diff){
     return result;
 }
 
-
 static double calc_distance(double prev_lon, double curr_lon, double prev_lat, double curr_lat) {
     double lon_diff_rad = (curr_lon - prev_lon) * M_PI / 180.0;
     double lat_diff_rad = (curr_lat - prev_lat) * M_PI / 180.0;
@@ -69,20 +66,25 @@ static double calc_distance(double prev_lon, double curr_lon, double prev_lat, d
     return Hubeny_formula(lat_diff_rad, lat_ave_rad, lon_diff_rad);
 }
 
-static double prev_lon = INVALID_LON;
-static double prev_lat = INVALID_LAT;
-
-static CalcDistanceResult update_distance(CalcDistanceSource * source) {
-    double current_distance = -1.0;
+static CalcDistanceResult update_distance(const CalcDistanceSource * source) {
+    double current_distance = 0.0;
     CalcDistanceResult result = CALC_DISTANCE_ERROR_UNDEFINED;
-#ifdef CONFIG_CALC_DISTANCE_DEBUG
+#ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_OUTPUT_JSON
+    printf("{\r\n");
+    printf("  \"fix_type\":%ld,\r\n", source->fix_type);
+    printf("  \"prev_lon\":%f, \"prev_lat\":%f,\r\n",prev_lon, prev_lat);
+    printf("  \"lon\":%f, \"lat\":%f,\r\n", source->lon_deg, source->lat_deg);
+    printf("  \"speed_kph\":%f,\r\n", source->speed_kph);
+    printf("  \"utc_date\":\"%s\", \"utc_time\":\"%s\",\r\n", source->utc_date_str, source->utc_time_str);
+#endif
+#ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
     update_called_count++;
 #endif
     if (source->fix_type == FIX_TYPE_3D) {
         if (SPEED_THRESH < source->speed_kph) {
             if (source->lon_deg != INVALID_LON && source->lat_deg != INVALID_LAT) {
                 if (prev_lon != INVALID_LON && prev_lat != INVALID_LAT) {
-#ifdef CONFIG_CALC_DISTANCE_DEBUG
+#ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
                     update_calced_count++;
 #endif
                     current_distance = calc_distance(prev_lon, source->lon_deg, prev_lat, source->lat_deg);
@@ -93,15 +95,12 @@ static CalcDistanceResult update_distance(CalcDistanceSource * source) {
                     if (unlock) {
                         unlock();
                     }
-                    prev_lon = source->lon_deg;
-                    prev_lat = source->lat_deg;
-                    clearSource(source);
                     result = CALC_DISTANCE_NO_ERROR;
                 } else {
-                    prev_lon = source->lon_deg;
-                    prev_lat = source->lat_deg;
                     result = CALC_DISTANCE_ERROR_INVALID_PERV_LON_OR_LAT;
                 }
+                prev_lon = source->lon_deg;
+                prev_lat = source->lat_deg;
             } else {
                 result = CALC_DISTANCE_ERROR_INVALID_CURRENT_LON_OR_LAT;
             }
@@ -111,11 +110,13 @@ static CalcDistanceResult update_distance(CalcDistanceSource * source) {
     } else {
         result = CALC_DISTANCE_ERROR_NOT_3D_FIXED;
     }
-#ifdef CONFIG_CALC_DISTANCE_DEBUG
-    printf("  \"cd\":%.4f, \"ad\":%.4f,\r\n",current_distance, accumurated_distance);
+#ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_OUTPUT_JSON
+    printf("  \"cd\":%f, \"ad\":%f,\r\n",current_distance, accumurated_distance);
+#ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
     printf("  \"call\":%ld, \"calc\":%ld, \"get\":%ld,\r\n",update_called_count, update_calced_count, get_called_count);
-    printf("  \"result\":%d,\r\n", result);
-//    printf("%.4f,%.4f, %ld, %ld, %ld, %ld\n",current_distance, accumurated_distance, update_called_count, update_calced_count, get_called_count, result);
+#endif
+    printf("  \"result\":%d\r\n", result);
+    printf("},\r\n");
 #endif
     return result;
 }
@@ -129,29 +130,39 @@ void clear_calc_distance(void) {
     accumurated_distance = 0.0;
     prev_lon = INVALID_LON;
     prev_lat = INVALID_LAT;
+#ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
+    update_called_count = 0;
+    update_calced_count = 0;
+    get_called_count = 0;
+#endif
 }
 
-uint32_t get_calc_distance(void) {
-    uint32_t result = (uint32_t)((accumurated_distance * 10.0) + 0.5);
-    return result;
+double get_calc_distance(void) {
+    return accumurated_distance;
 }
 
 void get_stat(uint32_t *p_update_called_count, uint32_t *p_update_calced_count, uint32_t *p_get_called_count){
-#ifdef CONFIG_CALC_DISTANCE_DEBUG
-    p_update_called_count = &update_called_count;
-    p_update_calced_count = &update_calced_count;
-    p_get_called_count = &get_called_count;
+#ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
+    *p_update_called_count = update_called_count;
+    *p_update_calced_count = update_calced_count;
+    *p_get_called_count = get_called_count;
 #endif
 }
 
 //////////////////////// --------------- unit test code from here ----------------
-#ifdef CALC_DISTANCE_UNIT_TEST_CORE
+#ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_UNIT_TEST_CORE
 typedef struct {
     CalcDistanceSource source;
     double prev_lon_exp;
     double prev_lat_exp;
     CalcDistanceResult exp;
 } CoreTestData1Type;
+
+typedef struct {
+    CalcDistanceSource source;
+    double exp_distance;
+} CoreTestData2Type;
+
 
 static const CoreTestData1Type test_data_1[] = {
     // combination of invalid parameters
@@ -183,26 +194,55 @@ static const CoreTestData1Type test_data_2[] = {
     {{13.0, 14.0, SPEED_THRESH+1.0, FIX_TYPE_3D}, 11.0,        12.0,        CALC_DISTANCE_NO_ERROR},
 };
 
+// https://qiita.com/Yuzu2yan/items/0f312954feeb3c83c70e より
+// 
+// 東京スカイツリー(35.71007721380533, 139.81070570812608) to すみだ水族館(35.709943856092394, 139.80959161455687) 
+// Hubenyの公式	0.10189728[km]
+// 東京スカイツリー(35.71007721380533, 139.81070570812608) to JR大阪駅(34.702423397783264, 135.495825762501)
+// Hubenyの公式	408.50135460[km]
+// 東京スカイツリー(35.71007721380533, 139.81070570812608) to イギリスのビッグベン(51.500702456806685, -0.12463613249688912) 
+// Hubenyの公式	11433.20920830[km]
+// 東京スカイツリー(35.71007721380533, 139.81070570812608) to 昭和基地(-68.75128159420852, 39.933121995422866)
+// Hubenyの公式	15726.38892853[km]
+// 東京スカイツリー(35.71007721380533, 139.81070570812608) to コルコバードの丘(-22.950611479037242, -43.21136119476384) 
+// Hubenyの公式	21262.37856370[km]
+
+static const CalcDistanceSource tokyo_source = {
+    139.81070570812608,  35.71007721380533, SPEED_THRESH+1.0, FIX_TYPE_3D
+};
+static const CoreTestData2Type test_data_3[] = {
+    {{139.80959161455687,  35.709943856092394, SPEED_THRESH+1.0, FIX_TYPE_3D}, 0.10189728 * 1000},
+    {{135.495825762501,    34.702423397783264, SPEED_THRESH+1.0, FIX_TYPE_3D}, 408.50135460 * 1000},
+    {{-0.12463613249688912,51.500702456806685, SPEED_THRESH+1.0, FIX_TYPE_3D}, 11433.20920830 * 1000},
+    {{39.933121995422866, -68.75128159420852,  SPEED_THRESH+1.0, FIX_TYPE_3D}, 15726.38892853 * 1000},
+    {{-43.21136119476384, -22.950611479037242, SPEED_THRESH+1.0, FIX_TYPE_3D}, 21262.37856370 * 1000},
+};
+
 #endif
 
 int calc_distance_core_test_main(void) {
-    printf("calc_distance_core_test_main()\r\n");
-#ifdef CALC_DISTANCE_UNIT_TEST_CORE
+#ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_UNIT_TEST_CORE
     int pass_count = 0;
     int fail_count = 0;
 
     clear_calc_distance();
+    printf("\"test_core\":{\r\n");
+    printf("  \"test_core_0\":[\r\n");
     for(int test_count = 0; test_count < sizeof(test_data_1)/sizeof(test_data_1[0]); test_count++) {
         CoreTestData1Type data = test_data_1[test_count];
-        printf("%d, ", test_count);
+        if (test_count == 0) {
+            printf("    [%d, ",test_count);
+        } else {
+            printf(",\r\n    [%d, ",test_count);
+        }
         bool prev_lon_passed = (prev_lon == data.prev_lon_exp);
-        printf("%f, %f, %s, ", prev_lon, data.prev_lon_exp, prev_lon_passed?"PASS":"FAIL");
+        printf("%f, %f, \"%s\", ", prev_lon, data.prev_lon_exp, prev_lon_passed?"PASS":"FAIL");
         bool prev_lat_passed = (prev_lat == data.prev_lat_exp);
-        printf("%f, %f, %s, ", prev_lat, data.prev_lat_exp, prev_lat_passed?"PASS":"FAIL");
+        printf("%f, %f, \"%s\", ", prev_lat, data.prev_lat_exp, prev_lat_passed?"PASS":"FAIL");
         printf("%f, %f, %f, %ld, ", data.source.lon_deg, data.source.lat_deg, data.source.speed_kph, data.source.fix_type);
         CalcDistanceResult result = update_distance(&data.source);
         bool result_passed = (result == data.exp);
-        printf("%d, %d, %s\n", result, data.exp, result_passed?"PASS":"FAIL");
+        printf("%d, %d, \"%s\"]", result, data.exp, result_passed?"PASS":"FAIL");
         if (prev_lon_passed) {
             pass_count++;
         } else {
@@ -218,22 +258,27 @@ int calc_distance_core_test_main(void) {
         } else {
             fail_count++;
         }
-        printf("get_calc_distance()=%ld\r\n",get_calc_distance());
     }
+    printf("\r\n  ],\r\n");
 
+    printf("  \"test_core_1\":[\r\n");
     // checking clear_calc_distance() makes clear prevs, after all valid parameters are inputted. 
     clear_calc_distance();
     for(int test_count = 0; test_count < sizeof(test_data_2)/sizeof(test_data_2[0]); test_count++) {
         CoreTestData1Type data = test_data_2[test_count];
-        printf("%d, ", test_count);
+        if (test_count == 0) {
+            printf("    [%d, ",test_count);
+        } else {
+            printf(",\r\n    [%d, ",test_count);
+        }
         bool prev_lon_passed = (prev_lon == data.prev_lon_exp);
-        printf("%f, %f, %s, ", prev_lon, data.prev_lon_exp, prev_lon_passed?"PASS":"FAIL");
+        printf("%f, %f, \"%s\", ", prev_lon, data.prev_lon_exp, prev_lon_passed?"PASS":"FAIL");
         bool prev_lat_passed = (prev_lat == data.prev_lat_exp);
-        printf("%f, %f, %s, ", prev_lat, data.prev_lat_exp, prev_lat_passed?"PASS":"FAIL");
+        printf("%f, %f, \"%s\", ", prev_lat, data.prev_lat_exp, prev_lat_passed?"PASS":"FAIL");
         printf("%f, %f, %f, %ld, ", data.source.lon_deg, data.source.lat_deg, data.source.speed_kph, data.source.fix_type);
         CalcDistanceResult result = update_distance(&data.source);
         bool result_passed = (result == data.exp);
-        printf("%d, %d, %s\n", result, data.exp, result_passed?"PASS":"FAIL");
+        printf("%d, %d, \"%s\"]", result, data.exp, result_passed?"PASS":"FAIL");
         if (prev_lon_passed) {
             pass_count++;
         } else {
@@ -249,9 +294,47 @@ int calc_distance_core_test_main(void) {
         } else {
             fail_count++;
         }
-        printf("get_calc_distance()=%ld\r\n",get_calc_distance());
     }
-    printf("PASS:%d, FAIL:%d\n", pass_count, fail_count);
+    printf("\r\n  ],\r\n");
+
+
+    printf("  \"test_core_2\":[\r\n");
+    for(int test_count = 0; test_count < sizeof(test_data_3)/sizeof(test_data_3[0]); test_count++) {
+        CoreTestData2Type data = test_data_3[test_count];
+        if (test_count == 0) {
+            printf("    [%d, ",test_count);
+        } else {
+            printf(",\r\n    [%d, ",test_count);
+        }
+        clear_calc_distance();
+        bool tokyo_result = (update_distance(&tokyo_source) == CALC_DISTANCE_ERROR_INVALID_PERV_LON_OR_LAT);
+        bool target_result = (update_distance(&data.source) == CALC_DISTANCE_NO_ERROR);
+        printf("\"%s\", \"%s\",",tokyo_result?"PASS":"FAIL", target_result?"PASS":"FAIL");
+        double calced_distance = get_calc_distance();
+        double diff = calced_distance - data.exp_distance;
+        double abs_diff = 0 < diff?diff:-diff;
+        bool diff_result = abs_diff < 1.0;
+        printf("%f, %f, %f, \"%s\"]",calced_distance, data.exp_distance, abs_diff, diff_result?"PASS":"FAIL");
+        if (tokyo_result){
+            pass_count++;
+        } else {
+            fail_count++;
+        }
+        if (target_result){
+            pass_count++;
+        } else {
+            fail_count++;
+        }
+        if (diff_result){
+            pass_count++;
+        } else {
+            fail_count++;
+        }
+    }
+    printf("\r\n  ],\r\n");
+
+    printf("  \"test_port_result\":{\"PASS\":%d, \"FAIL\":%d}\r\n", pass_count, fail_count);
+    printf("}\r\n");
     return fail_count;
 #else
     return 0;
