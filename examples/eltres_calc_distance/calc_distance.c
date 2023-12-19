@@ -20,16 +20,14 @@
 #define CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
 
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
-static uint32_t update_called_count = 0;
-static uint32_t update_calced_count = 0;
-static uint32_t get_called_count = 0;
+static uint32_t g_update_called_count = 0;
+static uint32_t g_update_calced_count = 0;
+static uint32_t g_get_called_count = 0;
 #endif
 
-static double accumurated_distance;
-static double prev_lon = INVALID_LON;
-static double prev_lat = INVALID_LAT;
-static void (*lock)(void) = (void(*)(void))0;
-static void (*unlock)(void) = (void(*)(void))0;
+static double g_accumurated_distance;
+static double g_prev_lon = INVALID_LON;
+static double g_prev_lat = INVALID_LAT;
 
 static double Hubeny_formula(double lat_diff, double lat_ave, double lon_diff){
     // constants not depends on position.
@@ -72,35 +70,29 @@ static CalcDistanceResult update_distance(const CalcDistanceSource * source) {
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_OUTPUT_JSON
     printf("{\r\n");
     printf("  \"fix_type\":%ld,\r\n", source->fix_type);
-    printf("  \"prev_lon\":%f, \"prev_lat\":%f,\r\n",prev_lon, prev_lat);
+    printf("  \"prev_lon\":%f, \"prev_lat\":%f,\r\n",g_prev_lon, g_prev_lat);
     printf("  \"lon\":%f, \"lat\":%f,\r\n", source->lon_deg, source->lat_deg);
     printf("  \"speed_kph\":%f,\r\n", source->speed_kph);
     printf("  \"utc_date\":\"%s\", \"utc_time\":\"%s\",\r\n", source->utc_date_str, source->utc_time_str);
 #endif
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
-    update_called_count++;
+    g_update_called_count++;
 #endif
     if (source->fix_type == FIX_TYPE_3D) {
         if (SPEED_THRESH < source->speed_kph) {
             if (source->lon_deg != INVALID_LON && source->lat_deg != INVALID_LAT) {
-                if (prev_lon != INVALID_LON && prev_lat != INVALID_LAT) {
+                if (g_prev_lon != INVALID_LON && g_prev_lat != INVALID_LAT) {
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
-                    update_calced_count++;
+                    g_update_calced_count++;
 #endif
-                    current_distance = calc_distance(prev_lon, source->lon_deg, prev_lat, source->lat_deg);
-                    if (lock) {
-                        lock();
-                    }
-                    accumurated_distance += current_distance;
-                    if (unlock) {
-                        unlock();
-                    }
+                    current_distance = calc_distance(g_prev_lon, source->lon_deg, g_prev_lat, source->lat_deg);
+                    g_accumurated_distance += current_distance;
                     result = CALC_DISTANCE_NO_ERROR;
                 } else {
                     result = CALC_DISTANCE_ERROR_INVALID_PERV_LON_OR_LAT;
                 }
-                prev_lon = source->lon_deg;
-                prev_lat = source->lat_deg;
+                g_prev_lon = source->lon_deg;
+                g_prev_lat = source->lat_deg;
             } else {
                 result = CALC_DISTANCE_ERROR_INVALID_CURRENT_LON_OR_LAT;
             }
@@ -111,9 +103,9 @@ static CalcDistanceResult update_distance(const CalcDistanceSource * source) {
         result = CALC_DISTANCE_ERROR_NOT_3D_FIXED;
     }
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_OUTPUT_JSON
-    printf("  \"cd\":%f, \"ad\":%f,\r\n",current_distance, accumurated_distance);
+    printf("  \"cd\":%f, \"ad\":%f,\r\n",current_distance, g_accumurated_distance);
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
-    printf("  \"call\":%ld, \"calc\":%ld, \"get\":%ld,\r\n",update_called_count, update_calced_count, get_called_count);
+    printf("  \"call\":%ld, \"calc\":%ld, \"get\":%ld,\r\n",g_update_called_count, g_update_calced_count, g_get_called_count);
 #endif
     printf("  \"result\":%d\r\n", result);
     printf("},\r\n");
@@ -127,25 +119,25 @@ void init_calc_distance(void *param){
 }
 
 void clear_calc_distance(void) {
-    accumurated_distance = 0.0;
-    prev_lon = INVALID_LON;
-    prev_lat = INVALID_LAT;
+    g_accumurated_distance = 0.0;
+    g_prev_lon = INVALID_LON;
+    g_prev_lat = INVALID_LAT;
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
-    update_called_count = 0;
-    update_calced_count = 0;
-    get_called_count = 0;
+    g_update_called_count = 0;
+    g_update_calced_count = 0;
+    g_get_called_count = 0;
 #endif
 }
 
 double get_calc_distance(void) {
-    return accumurated_distance;
+    return g_accumurated_distance;
 }
 
 void get_stat(uint32_t *p_update_called_count, uint32_t *p_update_calced_count, uint32_t *p_get_called_count){
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
-    *p_update_called_count = update_called_count;
-    *p_update_calced_count = update_calced_count;
-    *p_get_called_count = get_called_count;
+    *p_update_called_count = g_update_called_count;
+    *p_update_calced_count = g_update_calced_count;
+    *p_get_called_count = g_get_called_count;
 #endif
 }
 
@@ -235,10 +227,10 @@ int calc_distance_core_test_main(void) {
         } else {
             printf(",\r\n    [%d, ",test_count);
         }
-        bool prev_lon_passed = (prev_lon == data.prev_lon_exp);
-        printf("%f, %f, \"%s\", ", prev_lon, data.prev_lon_exp, prev_lon_passed?"PASS":"FAIL");
-        bool prev_lat_passed = (prev_lat == data.prev_lat_exp);
-        printf("%f, %f, \"%s\", ", prev_lat, data.prev_lat_exp, prev_lat_passed?"PASS":"FAIL");
+        bool prev_lon_passed = (g_prev_lon == data.prev_lon_exp);
+        printf("%f, %f, \"%s\", ", g_prev_lon, data.prev_lon_exp, prev_lon_passed?"PASS":"FAIL");
+        bool prev_lat_passed = (g_prev_lat == data.prev_lat_exp);
+        printf("%f, %f, \"%s\", ", g_prev_lat, data.prev_lat_exp, prev_lat_passed?"PASS":"FAIL");
         printf("%f, %f, %f, %ld, ", data.source.lon_deg, data.source.lat_deg, data.source.speed_kph, data.source.fix_type);
         CalcDistanceResult result = update_distance(&data.source);
         bool result_passed = (result == data.exp);
@@ -271,10 +263,10 @@ int calc_distance_core_test_main(void) {
         } else {
             printf(",\r\n    [%d, ",test_count);
         }
-        bool prev_lon_passed = (prev_lon == data.prev_lon_exp);
-        printf("%f, %f, \"%s\", ", prev_lon, data.prev_lon_exp, prev_lon_passed?"PASS":"FAIL");
-        bool prev_lat_passed = (prev_lat == data.prev_lat_exp);
-        printf("%f, %f, \"%s\", ", prev_lat, data.prev_lat_exp, prev_lat_passed?"PASS":"FAIL");
+        bool prev_lon_passed = (g_prev_lon == data.prev_lon_exp);
+        printf("%f, %f, \"%s\", ", g_prev_lon, data.prev_lon_exp, prev_lon_passed?"PASS":"FAIL");
+        bool prev_lat_passed = (g_prev_lat == data.prev_lat_exp);
+        printf("%f, %f, \"%s\", ", g_prev_lat, data.prev_lat_exp, prev_lat_passed?"PASS":"FAIL");
         printf("%f, %f, %f, %ld, ", data.source.lon_deg, data.source.lat_deg, data.source.speed_kph, data.source.fix_type);
         CalcDistanceResult result = update_distance(&data.source);
         bool result_passed = (result == data.exp);
