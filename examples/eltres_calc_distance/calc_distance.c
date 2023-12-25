@@ -16,8 +16,14 @@
 
 /// 将来的にConfigで指定できるようにする
 #define CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_UNIT_TEST_CORE
-#define CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_OUTPUT_JSON
+//#define CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_OUTPUT_JSON // こいつをコメントアウト解除するとビルドエラーになる。
 #define CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
+
+#ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_OUTPUT_JSON
+#  define printf_json(format, ...) printf_info(format, ...)
+#else
+#  define printf_json(format, ...)
+#endif
 
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
 static uint32_t g_update_called_count = 0;
@@ -68,12 +74,12 @@ static CalcDistanceResult update_distance(const CalcDistanceSource * source) {
     double current_distance = 0.0;
     CalcDistanceResult result = CALC_DISTANCE_ERROR_UNDEFINED;
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_OUTPUT_JSON
-    printf("{\r\n");
-    printf("  \"fix_type\":%ld,\r\n", source->fix_type);
-    printf("  \"prev_lon\":%f, \"prev_lat\":%f,\r\n",g_prev_lon, g_prev_lat);
-    printf("  \"lon\":%f, \"lat\":%f,\r\n", source->lon_deg, source->lat_deg);
-    printf("  \"speed_kph\":%f,\r\n", source->speed_kph);
-    printf("  \"utc_date\":\"%s\", \"utc_time\":\"%s\",\r\n", source->utc_date_str, source->utc_time_str);
+    printf_json("{\r\n");
+    printf_json("  \"fix_type\":%ld,\r\n", source->fix_type);
+    printf_json("  \"prev_lon\":%f, \"prev_lat\":%f,\r\n",g_prev_lon, g_prev_lat);
+    printf_json("  \"lon\":%f, \"lat\":%f,\r\n", source->lon_deg, source->lat_deg);
+    printf_json("  \"speed_kph\":%f,\r\n", source->speed_kph);
+    printf_json("  \"utc_date\":\"%s\", \"utc_time\":\"%s\",\r\n", source->utc_date_str, source->utc_time_str);
 #endif
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
     g_update_called_count++;
@@ -103,12 +109,12 @@ static CalcDistanceResult update_distance(const CalcDistanceSource * source) {
         result = CALC_DISTANCE_ERROR_NOT_3D_FIXED;
     }
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_OUTPUT_JSON
-    printf("  \"cd\":%f, \"ad\":%f,\r\n",current_distance, g_accumurated_distance);
+    printf_json("  \"cd\":%f, \"ad\":%f,\r\n",current_distance, g_accumurated_distance);
 #ifdef CONFIG_EXAMPLES_ELTRES_CALC_DISTANCE_CORE_DEBUG
-    printf("  \"call\":%ld, \"calc\":%ld, \"get\":%ld,\r\n",g_update_called_count, g_update_calced_count, g_get_called_count);
+    printf_json("  \"call\":%ld, \"calc\":%ld, \"get\":%ld,\r\n",g_update_called_count, g_update_calced_count, g_get_called_count);
 #endif
-    printf("  \"result\":%d\r\n", result);
-    printf("},\r\n");
+    printf_json("  \"result\":%d\r\n", result);
+    printf_json("},\r\n");
 #endif
     return result;
 }
@@ -218,23 +224,23 @@ int calc_distance_core_test_main(void) {
     int fail_count = 0;
 
     clear_calc_distance();
-    printf("\"test_core\":{\r\n");
-    printf("  \"test_core_0\":[\r\n");
+    printf_json("\"test_core\":{\r\n");
+    printf_json("  \"test_core_0\":[\r\n");
     for(int test_count = 0; test_count < sizeof(test_data_1)/sizeof(test_data_1[0]); test_count++) {
         CoreTestData1Type data = test_data_1[test_count];
         if (test_count == 0) {
-            printf("    [%d, ",test_count);
+            printf_json("    [%d, ",test_count);
         } else {
-            printf(",\r\n    [%d, ",test_count);
+            printf_json(",\r\n    [%d, ",test_count);
         }
         bool prev_lon_passed = (g_prev_lon == data.prev_lon_exp);
-        printf("%f, %f, \"%s\", ", g_prev_lon, data.prev_lon_exp, prev_lon_passed?"PASS":"FAIL");
+        printf_json("%f, %f, \"%s\", ", g_prev_lon, data.prev_lon_exp, prev_lon_passed?"PASS":"FAIL");
         bool prev_lat_passed = (g_prev_lat == data.prev_lat_exp);
-        printf("%f, %f, \"%s\", ", g_prev_lat, data.prev_lat_exp, prev_lat_passed?"PASS":"FAIL");
-        printf("%f, %f, %f, %ld, ", data.source.lon_deg, data.source.lat_deg, data.source.speed_kph, data.source.fix_type);
+        printf_json("%f, %f, \"%s\", ", g_prev_lat, data.prev_lat_exp, prev_lat_passed?"PASS":"FAIL");
+        printf_json("%f, %f, %f, %ld, ", data.source.lon_deg, data.source.lat_deg, data.source.speed_kph, data.source.fix_type);
         CalcDistanceResult result = update_distance(&data.source);
         bool result_passed = (result == data.exp);
-        printf("%d, %d, \"%s\"]", result, data.exp, result_passed?"PASS":"FAIL");
+        printf_json("%d, %d, \"%s\"]", result, data.exp, result_passed?"PASS":"FAIL");
         if (prev_lon_passed) {
             pass_count++;
         } else {
@@ -251,26 +257,26 @@ int calc_distance_core_test_main(void) {
             fail_count++;
         }
     }
-    printf("\r\n  ],\r\n");
+    printf_json("\r\n  ],\r\n");
 
-    printf("  \"test_core_1\":[\r\n");
+    printf_json("  \"test_core_1\":[\r\n");
     // checking clear_calc_distance() makes clear prevs, after all valid parameters are inputted. 
     clear_calc_distance();
     for(int test_count = 0; test_count < sizeof(test_data_2)/sizeof(test_data_2[0]); test_count++) {
         CoreTestData1Type data = test_data_2[test_count];
         if (test_count == 0) {
-            printf("    [%d, ",test_count);
+            printf_json("    [%d, ",test_count);
         } else {
-            printf(",\r\n    [%d, ",test_count);
+            printf_json(",\r\n    [%d, ",test_count);
         }
         bool prev_lon_passed = (g_prev_lon == data.prev_lon_exp);
-        printf("%f, %f, \"%s\", ", g_prev_lon, data.prev_lon_exp, prev_lon_passed?"PASS":"FAIL");
+        printf_json("%f, %f, \"%s\", ", g_prev_lon, data.prev_lon_exp, prev_lon_passed?"PASS":"FAIL");
         bool prev_lat_passed = (g_prev_lat == data.prev_lat_exp);
-        printf("%f, %f, \"%s\", ", g_prev_lat, data.prev_lat_exp, prev_lat_passed?"PASS":"FAIL");
-        printf("%f, %f, %f, %ld, ", data.source.lon_deg, data.source.lat_deg, data.source.speed_kph, data.source.fix_type);
+        printf_json("%f, %f, \"%s\", ", g_prev_lat, data.prev_lat_exp, prev_lat_passed?"PASS":"FAIL");
+        printf_json("%f, %f, %f, %ld, ", data.source.lon_deg, data.source.lat_deg, data.source.speed_kph, data.source.fix_type);
         CalcDistanceResult result = update_distance(&data.source);
         bool result_passed = (result == data.exp);
-        printf("%d, %d, \"%s\"]", result, data.exp, result_passed?"PASS":"FAIL");
+        printf_json("%d, %d, \"%s\"]", result, data.exp, result_passed?"PASS":"FAIL");
         if (prev_lon_passed) {
             pass_count++;
         } else {
@@ -287,26 +293,26 @@ int calc_distance_core_test_main(void) {
             fail_count++;
         }
     }
-    printf("\r\n  ],\r\n");
+    printf_json("\r\n  ],\r\n");
 
 
-    printf("  \"test_core_2\":[\r\n");
+    printf_json("  \"test_core_2\":[\r\n");
     for(int test_count = 0; test_count < sizeof(test_data_3)/sizeof(test_data_3[0]); test_count++) {
         CoreTestData2Type data = test_data_3[test_count];
         if (test_count == 0) {
-            printf("    [%d, ",test_count);
+            printf_json("    [%d, ",test_count);
         } else {
-            printf(",\r\n    [%d, ",test_count);
+            printf_json(",\r\n    [%d, ",test_count);
         }
         clear_calc_distance();
         bool tokyo_result = (update_distance(&tokyo_source) == CALC_DISTANCE_ERROR_INVALID_PERV_LON_OR_LAT);
         bool target_result = (update_distance(&data.source) == CALC_DISTANCE_NO_ERROR);
-        printf("\"%s\", \"%s\",",tokyo_result?"PASS":"FAIL", target_result?"PASS":"FAIL");
+        printf_json("\"%s\", \"%s\",",tokyo_result?"PASS":"FAIL", target_result?"PASS":"FAIL");
         double calced_distance = get_calc_distance();
         double diff = calced_distance - data.exp_distance;
         double abs_diff = 0 < diff?diff:-diff;
         bool diff_result = abs_diff < 1.0;
-        printf("%f, %f, %f, \"%s\"]",calced_distance, data.exp_distance, abs_diff, diff_result?"PASS":"FAIL");
+        printf_json("%f, %f, %f, \"%s\"]",calced_distance, data.exp_distance, abs_diff, diff_result?"PASS":"FAIL");
         if (tokyo_result){
             pass_count++;
         } else {
@@ -323,10 +329,10 @@ int calc_distance_core_test_main(void) {
             fail_count++;
         }
     }
-    printf("\r\n  ],\r\n");
+    printf_json("\r\n  ],\r\n");
 
-    printf("  \"test_port_result\":{\"PASS\":%d, \"FAIL\":%d}\r\n", pass_count, fail_count);
-    printf("}\r\n");
+    printf_json("  \"test_port_result\":{\"PASS\":%d, \"FAIL\":%d}\r\n", pass_count, fail_count);
+    printf_json("}\r\n");
     return fail_count;
 #else
     return 0;
