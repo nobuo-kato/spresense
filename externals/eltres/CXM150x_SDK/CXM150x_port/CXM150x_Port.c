@@ -561,7 +561,7 @@ void wrapper_CXM150x_system_reset(void){
 // Log出力用追加
 
 FILE* logFile = NULL;
-char logPath[]="/mnt/sd0/LOG/";
+char logPath[]="/mnt/sd0/LOG";
 char logName[255]={0};
 int log_running=0;
 time_t swStart;
@@ -585,7 +585,7 @@ void open_logfile(void){
 
     struct tm s_tm;
     localtime_r(&ts.tv_sec, &s_tm);
-    sprintf(logName,"%slog%02d%02d%02d%02d%02d.log",
+    sprintf(logName,"%s/log%02d%02d%02d%02d%02d.log",
     logPath,s_tm.tm_year+1900, s_tm.tm_mon+1, s_tm.tm_mday, s_tm.tm_hour,s_tm.tm_min);
     printf("Open logfile '%s'\r\n",logName);
     logFile=fopen(logName,"a");
