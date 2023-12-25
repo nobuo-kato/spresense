@@ -38,6 +38,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <stdarg.h>
+
 #ifdef CONFIG_ARCH_BOARD_SPRESENSE
 #include <unistd.h>
 #include <fcntl.h>
@@ -45,6 +47,8 @@
 #include <nuttx/board.h>
 #include <arch/board/board.h>
 #include <arch/chip/pin.h>
+
+#include <sys/stat.h>
 
 #include <pthread.h>
 #include <arch/chip/uart0.h>
@@ -552,3 +556,107 @@ void wrapper_CXM150x_int_out2(void){
 void wrapper_CXM150x_system_reset(void){
     //NVIC_SystemReset();
 }
+
+
+// Log出力用追加
+
+FILE* logFile = NULL;
+char logPath[]="/mnt/sd0/LOG/";
+char logName[255]={0};
+int log_running=0;
+time_t swStart;
+int fileCreated=0;
+
+void open_logfile(void){
+    struct stat st;
+    stat(logPath,&st);
+    if(!S_ISDIR(st.st_mode)){
+        printf("Create directory '%s'\n",logPath);
+        mkdir(logPath,0666);
+    }
+    int ret;
+    struct timespec ts;
+    ret = clock_gettime(CLOCK_REALTIME, &ts);
+    if(ret){ //rtc error
+        logFile = NULL;
+        log_running=0;
+        return;
+    }
+
+    struct tm s_tm;
+    localtime_r(&ts.tv_sec, &s_tm);
+    sprintf(logName,"%slog%02d%02d%02d%02d%02d.log",
+    logPath,s_tm.tm_year+1900, s_tm.tm_mon+1, s_tm.tm_mday, s_tm.tm_hour,s_tm.tm_min);
+    printf("Open logfile '%s'\r\n",logName);
+    logFile=fopen(logName,"a");
+    log_running=1;
+    fileCreated=1;
+}
+
+void close_logfile(void){
+    if(log_running){
+        log_running=0;
+        printf("Close logfile '%s'\r\n",logName);
+        fclose(logFile);
+    }
+}
+static int once15min(void){
+    int ret=0;
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+
+    struct tm s_tm;
+    localtime_r(&ts.tv_sec, &s_tm);
+
+    if(s_tm.tm_min%15==0){
+        ret = !fileCreated;
+        fileCreated=1;
+    }else{
+        fileCreated=0;
+    }
+    return ret;
+}
+
+int printf_info(const char* fmt, ...){
+    va_list args;
+    va_start( args, fmt);
+    int ret = 0;
+    ret = vprintf(fmt,args);
+    if( ! logFile || !log_running){
+        return ret;
+    }
+    if(once15min()){
+        close_logfile();
+        open_logfile();
+    }
+    ret=vfprintf( logFile, fmt, args);
+    return ret;
+}
+
+void init_led(void){
+    board_gpio_config(GPIO_LED1,0,false,true,0);
+    board_gpio_config(GPIO_LED2,0,false,true,0);
+    board_gpio_config(GPIO_LED3,0,false,true,0);
+    board_gpio_config(GPIO_LED4,0,false,true,0);
+}
+
+void set_led(int ptn){
+    board_gpio_write(GPIO_LED1,ptn&1);
+    board_gpio_write(GPIO_LED2,ptn&2);
+    board_gpio_write(GPIO_LED3,ptn&4);
+    board_gpio_write(GPIO_LED4,ptn&8);
+}
+
+void logging(int f){
+    f=(f!=0);
+    if(log_running ^ f){
+        if( !log_running){
+            printf("Logging start.\r\n");
+            open_logfile();
+        }else{
+            printf("Logging stop.\r\n");
+            close_logfile();
+        }
+    }
+}
+

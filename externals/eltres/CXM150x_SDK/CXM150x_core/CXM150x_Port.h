@@ -50,11 +50,14 @@
 #else
 #  define printf_err(format, ...)
 #endif
-
 #ifdef CONFIG_EXTERNALS_ELTRES_DEBUG_INFO
-#  define printf_info(format, ...)  printf(format, ##__VA_ARGS__)
+int printf_info(const char* format, ...);
+void open_logfile(void);
+
 #else
 #  define printf_info(format, ...)
+# define open_logfile()
+
 #endif
 
 /* Board-specific pin assignment */
@@ -98,4 +101,7 @@ void wrapper_CXM150x_enter_stop_mode(void);
 void wrapper_CXM150x_resume_stop_mode(void);
 void wrapper_CXM150x_system_reset(void);
 
+void init_led(void);
+void set_led(int ptn);
+void logging(int f);
 #endif // __CXM150x_PORT_H
